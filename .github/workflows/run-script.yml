@@ -2,16 +2,12 @@ name: Run Python Script Every 10 Minutes
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Every 15 minutes
+    - cron: '*/15 * * * *'  # Every 10 minutes
   workflow_dispatch:  # اجرا به صورت دستی هم فعال میشه
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
-    env:
-      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-      CHAT_ID: ${{ secrets.CHAT_ID }}
 
     steps:
       - name: Checkout code
