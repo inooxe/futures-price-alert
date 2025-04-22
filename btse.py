@@ -1,10 +1,9 @@
 import requests
 from tabulate import tabulate
-import os
 
 # Telegram bot information
-telegram_token = os.getenv("TELEGRAM_TOKEN")  # دریافت از محیط GitHub Secrets
-chat_id = os.getenv("CHAT_ID")  # دریافت از محیط GitHub Secrets
+telegram_token = "7873650895:AAFGndHjZQFOjxGKOawDgaUSj8OoryVZuJo"
+chat_id = "315381350"  # chat_id استخراج‌شده از پاسخ تلگرام
 
 def send_message_to_telegram(message, token, chat_id):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
