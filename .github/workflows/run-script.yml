@@ -1,16 +1,14 @@
-name: Run Python Script Every 10 Minutes
+name: Run Script Periodically
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Every 15 minutes
-  workflow_dispatch:  # اجرا به صورت دستی هم فعال میشه
+    - cron: '*/10 * * * *' # Runs every 10 minutes
 
 jobs:
   run-script:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -21,7 +19,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests tabulate
+          pip install requests
 
-      - name: Run script
-        run: python btse.py
+      - name: Run the script
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python btse_futures_bot.py
