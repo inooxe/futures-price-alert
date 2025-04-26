@@ -1,57 +1,59 @@
 import requests
-from tabulate import tabulate
 
 # Telegram bot information
-telegram_token = "
-chat_id = ""  # chat_id استخراج‌شده از پاسخ تلگرام
+telegram_token = "7873650895:AAFGndHjZQFOjxGKOawDgaUSj8OoryVZuJo"
+chat_id = "315381350"
 
 def send_message_to_telegram(message, token, chat_id):
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     
-    # اگر پیام طولانی باشد، آن را به بخش‌های کوچکتر تقسیم کنید
     max_length = 4096
     if len(message) > max_length:
-        # تقسیم پیام به بخش‌های کوچک
         parts = [message[i:i+max_length] for i in range(0, len(message), max_length)]
         for part in parts:
             response = requests.post(url, data={'chat_id': chat_id, 'text': part, 'parse_mode': 'Markdown'})
             if response.status_code != 200:
                 print(f"Error sending message to Telegram: {response.status_code}")
     else:
-        # ارسال پیام به تلگرام
         response = requests.post(url, data={'chat_id': chat_id, 'text': message, 'parse_mode': 'Markdown'})
         if response.status_code != 200:
             print(f"Error sending message to Telegram: {response.status_code}")
 
-# Fetching the list of all futures markets
-markets_url = "https://api.btse.com/futures/api/v2/market_summary"
+# Fetching the list of all futures prices
+markets_url = "https://api.btse.com/futures/api/v2.1/price"
+market_summary_url = "https://api.btse.com/futures/api/v2.1/market_summary"
 response = requests.get(markets_url)
+summary_response = requests.get(market_summary_url)
 
-# Check the status code and response
-if response.status_code == 200:
+if response.status_code == 200 and summary_response.status_code == 200:
     data = response.json()
-    print(f"Received data: {data}")  # برای مشاهده داده‌های دریافتی در ترمینال
+    summary_data = summary_response.json()
+    print(f"Received price data: {data}")
+    print(f"Received summary data: {summary_data}")
 
     result_table = []
 
-    # If the response is valid, process the data
+    # Create a dictionary for quick lookup of fundingRate and percentageChange
+    summary_dict = {item.get('symbol'): item for item in summary_data if item.get('symbol')}
+
     if isinstance(data, list):
         for item in data:
             symbol = item.get('symbol')
-            last = item.get('last') or 0
-            index = item.get('lowestAsk') or 0
-            mark = item.get('highestBid') or 0
-            funding = item.get('fundingRate') or 0
-            volume = item.get('volume') or 0
+            last = item.get('lastPrice') or 0
+            index = item.get('indexPrice') or 0
+            mark = item.get('markPrice') or 0
 
-            # Calculate percentage differences
+            # Fetch fundingRate and percentageChange from summary data
+            summary_item = summary_dict.get(symbol, {})
+            funding = summary_item.get('fundingRate', 0)  # Use actual fundingRate or default to 0
+            change_24h = summary_item.get('percentageChange', 0)  # Use actual percentageChange or default to 0
+
             def percent_diff(a, b):
                 return abs(a - b) / b * 100 if b else 0
 
             idx_diff = percent_diff(last, index)
             mark_diff = percent_diff(last, mark)
 
-            # Warnings
             warnings = []
             if idx_diff > 1:
                 warnings.append("⚠️ Index diff > 1%")
@@ -59,38 +61,42 @@ if response.status_code == 200:
                 warnings.append("⚠️ Mark diff > 1%")
             if abs(funding) > 0.01:
                 warnings.append("⚠️ Funding > ±1%")
-
-            # Only show warnings when the price difference is greater than 1%
+            if abs(change_24h) > 50:
+                warnings.append("🚨 24h Change > ±50%")
             if idx_diff > 1 or mark_diff > 1:
                 warnings.append("⚠️ Large price difference detected (>1%)")
 
-            # Determine color for funding rate
-            if funding > 0:
-                funding_color = f"{funding * 100:.3f}%"
-            else:
-                funding_color = f"{funding * 100:.3f}%"
+            funding_color = f"{funding * 100:.3f}%"
+            change_24h_str = f"{change_24h:.2f}%"
 
-            # Add row to table
-            result_table.append([symbol, index, mark, last, funding_color, ", ".join(warnings), f"{volume:,.0f}",
-                                 round(abs(last - index), 2), round(abs(last - mark), 2), round(idx_diff, 2), round(mark_diff, 2)])
+            result_table.append([
+                symbol, index, mark, last, funding_color,
+                ", ".join(warnings),
+                round(abs(last - index), 2),
+                round(abs(last - mark), 2),
+                round(idx_diff, 2),
+                round(mark_diff, 2),
+                change_24h_str
+            ])
 
-        # Display table in Markdown format
-        headers = ["Symbol", "Index Price", "Mark Price", "Futures Price", "Funding Rate", "Warnings", "Volume (24h)", "Index Diff", "Mark Diff", "Index % Diff", "Mark % Diff"]
+        headers = [
+            "Symbol", "Index Price", "Mark Price", "Futures Price",
+            "Funding Rate", "Warnings", "Index Diff",
+            "Mark Diff", "Index % Diff", "Mark % Diff", "Change 24h"
+        ]
 
-        # Create the table in Markdown format
-        table_text = "| Symbol | Index Price | Mark Price | Futures Price | Funding Rate | Warnings | Volume (24h) | Index Diff | Mark Diff | Index % Diff | Mark % Diff |\n"
-        table_text += "|--------|-------------|------------|---------------|--------------|----------|--------------|------------|-----------|---------------|-------------|\n"
+        table_text = "BTSE\n\n"  # Adding BTSE at the top
+        table_text += "| " + " | ".join(headers) + " |\n"
+        table_text += "|--------|-------------|------------|---------------|--------------|----------|------------|-----------|---------------|-------------|-------------|\n"
         
         for row in result_table:
             table_text += "| " + " | ".join([str(cell) for cell in row]) + " |\n"
 
-        # Print table for debugging in the terminal
-        print(table_text)  # برای مشاهده جدول در ترمینال
-
-        # ارسال جدول به تلگرام
+        print(table_text)
         send_message_to_telegram(table_text, telegram_token, chat_id)
 
     else:
         print("Invalid response format or empty data.")
 else:
-    print(f"Error: {response.status_code} - {response.text}")
+    print(f"Price API Error: {response.status_code} - {response.text}")
+    print(f"Summary API Error: {summary_response.status_code} - {summary_response.text}")
